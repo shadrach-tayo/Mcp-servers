@@ -1,8 +1,25 @@
 import asyncio
+import os
+
 from pprint import pprint
 from fastmcp import Client
+from fastmcp.client.auth import OAuth
+from key_value.aio.stores.redis import RedisStore
 
-client = Client("http://localhost:8007/mcp")
+cache_store = RedisStore(
+    url=os.environ.get("REDIS_URL"),
+)
+
+# Server requires OAuth (OAuthProxy). This opens a browser login on first run
+# and caches tokens for later calls. LoginRadius requires an OIDC scope.
+client = Client(
+    "http://127.0.0.1:8007/api/mcp",
+    auth=OAuth(
+        mcp_url="http://127.0.0.1:8007/api/mcp",
+        scopes=["openid", "profile", "email"],
+        token_storage=cache_store,
+    ),
+)
 
 
 async def call_tool():

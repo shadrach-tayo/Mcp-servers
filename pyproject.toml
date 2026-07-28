@@ -12,6 +12,7 @@ dependencies = [
     "asyncio>=4.0.0",
     "fastmcp>=3.4.4",
     "psycopg2>=2.9.12",
+    "py-key-value-aio[redis]>=0.4.5",
 ]
 
 [project.scripts]
@@ -19,7 +20,7 @@ mcp-starter = "mcp_starter:main"
 mcp-client = "mcp_starter.client:main"
 postgres-mcp = "postgres_mcp:main"
 postgres-client = "postgres_mcp.client:main"
-memory-mcp = "memory_mcp:main"
+memory-mcp = "memory_mcp.server:main"
 memory-client = "memory_mcp.client:main"
 
 [build-system]
