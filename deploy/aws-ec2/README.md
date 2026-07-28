@@ -172,7 +172,7 @@ sudo apt-get install -y nginx certbot python3-certbot-nginx
 
 ```bash
 sudo dnf install -y nginx
-# certbot: use snap, pip, or ACM instead — AL2023 varies; many teams use ALB+ACM and skip certbot on AL
+# certbot: not via snap (snapd is not in AL2023 repos) — use pip below, or ALB+ACM / Cloudflare Origin cert
 ```
 
 ### 3. App + env (same as Part 1A)
@@ -212,10 +212,11 @@ sudo mkdir -p /var/www/certbot
 sudo cp deploy/aws-ec2/nginx/memory-mcp.bootstrap.conf /etc/nginx/conf.d/memory-mcp.conf
 sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
 
-# Install certbot (Amazon Linux 2023 example: snap — see certbot docs for Ubuntu/dnf)
-sudo dnf install -y snapd && sudo systemctl enable --now snapd
-sudo ln -sf /var/lib/snapd/snap /snap && sudo snap install --classic certbot
-sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+# Install certbot (Amazon Linux 2023 — pip; Ubuntu: apt install certbot)
+sudo python3 -m venv /opt/certbot
+sudo /opt/certbot/bin/pip install --upgrade pip
+sudo /opt/certbot/bin/pip install certbot
+sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
 
 sudo certbot certonly --webroot -w /var/www/certbot -d mcp.livemigrate.ai
 

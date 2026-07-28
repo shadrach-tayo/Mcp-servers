@@ -6,20 +6,20 @@ from fastmcp import Client
 from fastmcp.client.auth import OAuth
 from key_value.aio.stores.redis import RedisStore
 
-cache_store = RedisStore(
-    url=os.environ.get("REDIS_URL"),
-)
+MCP_URL = os.environ.get(
+    "MCP_CLIENT_URL", "https://mcp.livemigrate.ai/api/mcp"
+).rstrip("/")
 
-# Server requires OAuth (OAuthProxy). This opens a browser login on first run
-# and caches tokens for later calls. LoginRadius requires an OIDC scope.
-client = Client(
-    "http://127.0.0.1:8007/api/mcp",
-    auth=OAuth(
-        mcp_url="http://127.0.0.1:8007/api/mcp",
-        scopes=["openid", "profile", "email"],
-        token_storage=cache_store,
-    ),
-)
+_redis_url = os.environ.get("REDIS_URL")
+_oauth_kwargs: dict = {
+    "mcp_url": MCP_URL,
+    "scopes": ["openid", "profile", "email"],
+}
+if _redis_url:
+    _oauth_kwargs["token_storage"] = RedisStore(url=_redis_url)
+# Without REDIS_URL, FastMCP uses in-memory token storage (fine for local dev).
+
+client = Client(MCP_URL, auth=OAuth(**_oauth_kwargs))
 
 
 async def call_tool():
