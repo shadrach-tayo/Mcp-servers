@@ -199,39 +199,34 @@ Uses **`127.0.0.1:8007`** so MCP is not exposed except through nginx.
 
 Sample config proxies **`/` → Uvicorn** so OAuth **`/.well-known/*`** (app root) and **`/api/*`** (MCP mount) both work. Default hostname in the file is **`mcp.livemigrate.ai`** — change `server_name` and cert paths if needed.
 
-**Cloudflare:** DNS **A** record `mcp` → EC2; SSL/TLS **Full (strict)** with Let’s Encrypt or a [Cloudflare Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/) on nginx.
+**Cloudflare:** DNS **A** record `mcp` → EC2; SSL/TLS **Full (strict)** once origin has a valid cert (Let’s Encrypt recommended below).
 
 Always run **`sudo nginx -t`** (not as `ssm-user` — otherwise permission errors on logs).
 
-**No cert files yet?** `memory-mcp.conf` references Let’s Encrypt paths and **`nginx -t` will fail** until they exist. Use the bootstrap config first:
+**Recommended — Let’s Encrypt (HTTP-01 via webroot)**
+
+Security group: allow **80** and **443**. `memory-mcp.conf` points at `/etc/letsencrypt/live/mcp.livemigrate.ai/` — **`nginx -t` fails until certbot creates those files.**
 
 ```bash
+sudo mkdir -p /var/www/certbot
 sudo cp deploy/aws-ec2/nginx/memory-mcp.bootstrap.conf /etc/nginx/conf.d/memory-mcp.conf
 sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
-```
 
-**Cloudflare Origin cert (typical with orange-cloud proxy):**
+# Install certbot (Amazon Linux 2023 example: snap — see certbot docs for Ubuntu/dnf)
+sudo dnf install -y snapd && sudo systemctl enable --now snapd
+sudo ln -sf /var/lib/snapd/snap /snap && sudo snap install --classic certbot
+sudo ln -sf /snap/bin/certbot /usr/bin/certbot
 
-```bash
-sudo mkdir -p /etc/nginx/ssl
-# Paste Origin Certificate + private key from Cloudflare → SSL → Origin Server
-sudo nano /etc/nginx/ssl/cloudflare-origin.pem
-sudo nano /etc/nginx/ssl/cloudflare-origin-key.pem
-sudo chmod 600 /etc/nginx/ssl/cloudflare-origin-key.pem
+sudo certbot certonly --webroot -w /var/www/certbot -d mcp.livemigrate.ai
+
 sudo cp deploy/aws-ec2/nginx/memory-mcp.conf /etc/nginx/conf.d/memory-mcp.conf
-# Point ssl_certificate* at /etc/nginx/ssl/cloudflare-origin*.pem (see comments in file)
 sudo nginx -t && sudo systemctl reload nginx
+sudo certbot renew --dry-run
 ```
 
-**Let’s Encrypt** (needs reachable HTTP-01 or DNS challenge):
+Cloudflare → SSL/TLS → **Full (strict)**.
 
-```bash
-sudo cp deploy/aws-ec2/nginx/memory-mcp.conf /etc/nginx/conf.d/memory-mcp.conf
-sudo nano /etc/nginx/conf.d/memory-mcp.conf   # server_name, cert paths
-sudo nginx -t && sudo systemctl enable --now nginx
-sudo certbot --nginx -d mcp.livemigrate.ai   # Ubuntu-style; adjust on AL2023
-sudo systemctl reload nginx
-```
+**Alternative — Cloudflare Origin cert:** paste PEMs under `/etc/nginx/ssl/`, swap `ssl_certificate*` in `memory-mcp.conf` (see comments in file), then reload nginx.
 
 Set env to match the public URL (no `/api` in `BASE_URL`; use `MCP_MOUNT_PREFIX=/api`):
 
