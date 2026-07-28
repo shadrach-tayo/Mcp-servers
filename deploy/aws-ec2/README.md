@@ -197,12 +197,22 @@ Uses **`127.0.0.1:8007`** so MCP is not exposed except through nginx.
 
 ### 5. nginx config
 
+Sample config proxies **`/` → Uvicorn** so OAuth **`/.well-known/*`** (app root) and **`/api/*`** (MCP mount) both work. Default hostname in the file is **`mcp.livemigrate.ai`** — change `server_name` and cert paths if needed.
+
+**Cloudflare:** DNS **A** record `mcp` → EC2; SSL/TLS **Full (strict)** with Let’s Encrypt or a [Cloudflare Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/) on nginx.
+
 ```bash
 sudo cp deploy/aws-ec2/nginx/memory-mcp.conf /etc/nginx/conf.d/memory-mcp.conf
-# Edit server_name to your domain
+sudo nano /etc/nginx/conf.d/memory-mcp.conf   # server_name, cert paths
 sudo nginx -t && sudo systemctl enable --now nginx
-sudo certbot --nginx -d memory-mcp.example.com   # Ubuntu-style; adjust on AL2023
+sudo certbot --nginx -d mcp.livemigrate.ai   # Ubuntu-style; adjust on AL2023
 sudo systemctl reload nginx
+```
+
+Set env to match the public URL (no `/api` in `BASE_URL`; use `MCP_MOUNT_PREFIX=/api`):
+
+```bash
+BASE_URL=https://mcp.livemigrate.ai
 ```
 
 Important (from [FastMCP HTTP deployment](https://gofastmcp.com/deployment/http#reverse-proxy-nginx)):
@@ -214,9 +224,11 @@ Important (from [FastMCP HTTP deployment](https://gofastmcp.com/deployment/http#
 ### 6. Verify
 
 ```bash
-curl -s http://127.0.0.1:8007/api/health          # on instance
-curl -s https://memory-mcp.example.com/api/health   # public (nginx proxies /api/)
-curl -s https://memory-mcp.example.com/mcp     # MCP endpoint (may require auth)
+curl -s http://127.0.0.1:8007/api/health
+curl -s https://mcp.livemigrate.ai/api/health
+curl -sI https://mcp.livemigrate.ai/.well-known/oauth-authorization-server
+# MCP URL for clients (with default MCP_PATH=/mcp):
+# https://mcp.livemigrate.ai/api/mcp
 ```
 
 ### 7. Multi-instance + nginx
