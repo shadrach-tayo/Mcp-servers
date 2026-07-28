@@ -11,7 +11,7 @@ dependencies = [
     "aiofiles>=25.1.0",
     "asyncio>=4.0.0",
     "fastmcp>=3.4.4",
-    "psycopg2>=2.9.12",
+    "psycopg2-binary>=2.9.12",
     "py-key-value-aio[redis]>=0.4.5",
 ]
 

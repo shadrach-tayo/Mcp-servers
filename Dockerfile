@@ -8,13 +8,6 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# psycopg2 source build: libpq + Python/C headers (assert.h via libc6-dev)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
@@ -26,10 +19,7 @@ FROM python:3.13-slim-bookworm AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 10001 app
+RUN useradd --create-home --uid 10001 app
 
 WORKDIR /app
 

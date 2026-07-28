@@ -37,17 +37,70 @@ Required env (see `env.example`):
 
 ### 2. Install on the VM
 
-```bash
-sudo apt-get update && sudo apt-get install -y git nginx certbot python3-venv
+**SSM Session Manager:** new shells often start in `/usr/bin`. Always `cd` to the repo with an **absolute path** before `uv sync`, or you get errors like  
+`Permission denied` on `/usr/bin/opt/Mcp-servers/.venv`.
 
+#### Ubuntu / Debian
+
+```bash
+sudo apt-get update && sudo apt-get install -y git nginx certbot python3-venv build-essential libpq-dev python3-dev
+```
+
+#### Amazon Linux 2023 / RHEL / Fedora (`dnf` / `yum`)
+
+Debian package names **do not work**. Use:
+
+```bash
+sudo dnf install -y git nginx python3-devel postgresql-devel gcc gcc-c++ make
+# certbot on AL2023 (optional, for TLS):
+# sudo dnf install -y certbot python3-certbot-nginx
+```
+
+| Ubuntu (apt)        | Amazon Linux (dnf)   |
+|---------------------|----------------------|
+| `build-essential`   | `gcc gcc-c++ make`   |
+| `libpq-dev`         | `postgresql-devel`   |
+| `python3-dev`       | `python3-devel`      |
+
+#### Common steps (all distros)
+
+```bash
 # Clone your repo (or rsync artifact)
-git clone <your-repo> /opt/mcp-starter
-cd /opt/mcp-starter
+sudo mkdir -p /opt && sudo chown "$USER:$USER" /opt
+git clone <your-repo> /opt/Mcp-servers
+cd /opt/Mcp-servers
+pwd   # must be /opt/Mcp-servers, not /usr/bin
 
 # Install uv (see https://docs.astral.sh/uv/)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
+uv sync --frozen --no-dev
+```
+
+If `uv sync` fails building `psycopg2` with **`pg_config executable not found`**, install the Postgres **devel** packages above **or** `git pull` the latest repo (uses **`psycopg2-binary`**, no compile).
+
+If the repo was cloned as root, fix ownership then sync as the app user:
+
+```bash
+sudo chown -R "$USER:$USER" /opt/Mcp-servers   # or /opt/mcp-servers — match your path
+cd /opt/Mcp-servers
+uv sync --frozen --no-dev
+```
+
+**Do not** run `sudo uv sync`: `uv` is usually installed in `~/.local/bin` and is not on root’s `PATH`. Prefer fixing directory ownership and running `uv` as your user.
+
+If you truly must run as root once (not recommended):
+
+```bash
+sudo env "PATH=$HOME/.local/bin:$PATH" uv sync --frozen --no-dev
+```
+
+Better: install the app under the deploy user’s home directory to avoid `/opt` permission issues:
+
+```bash
+git clone <your-repo> ~/Mcp-servers
+cd ~/Mcp-servers
 uv sync --frozen --no-dev
 ```
 
