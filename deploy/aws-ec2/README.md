@@ -201,6 +201,30 @@ Sample config proxies **`/` → Uvicorn** so OAuth **`/.well-known/*`** (app roo
 
 **Cloudflare:** DNS **A** record `mcp` → EC2; SSL/TLS **Full (strict)** with Let’s Encrypt or a [Cloudflare Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/) on nginx.
 
+Always run **`sudo nginx -t`** (not as `ssm-user` — otherwise permission errors on logs).
+
+**No cert files yet?** `memory-mcp.conf` references Let’s Encrypt paths and **`nginx -t` will fail** until they exist. Use the bootstrap config first:
+
+```bash
+sudo cp deploy/aws-ec2/nginx/memory-mcp.bootstrap.conf /etc/nginx/conf.d/memory-mcp.conf
+sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
+```
+
+**Cloudflare Origin cert (typical with orange-cloud proxy):**
+
+```bash
+sudo mkdir -p /etc/nginx/ssl
+# Paste Origin Certificate + private key from Cloudflare → SSL → Origin Server
+sudo nano /etc/nginx/ssl/cloudflare-origin.pem
+sudo nano /etc/nginx/ssl/cloudflare-origin-key.pem
+sudo chmod 600 /etc/nginx/ssl/cloudflare-origin-key.pem
+sudo cp deploy/aws-ec2/nginx/memory-mcp.conf /etc/nginx/conf.d/memory-mcp.conf
+# Point ssl_certificate* at /etc/nginx/ssl/cloudflare-origin*.pem (see comments in file)
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**Let’s Encrypt** (needs reachable HTTP-01 or DNS challenge):
+
 ```bash
 sudo cp deploy/aws-ec2/nginx/memory-mcp.conf /etc/nginx/conf.d/memory-mcp.conf
 sudo nano /etc/nginx/conf.d/memory-mcp.conf   # server_name, cert paths
