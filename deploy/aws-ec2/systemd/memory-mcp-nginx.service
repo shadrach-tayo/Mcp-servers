@@ -4,13 +4,14 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+# Amazon Linux: ec2-user. Ubuntu: www-data.
+User=ec2-user
+Group=ec2-user
 WorkingDirectory=/opt/mcp-servers
 EnvironmentFile=/etc/mcp-servers/env
 Environment=PATH=/opt/mcp-servers/.venv/bin:/usr/local/bin:/usr/bin
-# Only localhost — nginx on :443 is the public entrypoint
-ExecStart=/opt/mcp-servers/.venv/bin/uvicorn memory_mcp.server:app --host 127.0.0.1 --port 8007
+Environment=PYTHONPATH=/opt/mcp-servers/src
+ExecStart=/opt/mcp-servers/.venv/bin/python -m uvicorn memory_mcp.server:app --host 127.0.0.1 --port 8007
 Restart=always
 RestartSec=5
 

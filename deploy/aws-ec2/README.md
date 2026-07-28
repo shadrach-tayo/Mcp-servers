@@ -15,8 +15,8 @@ ASGI entrypoint: `memory_mcp.server:app` (`stateless_http=True`).
 uv run --env-file .env uvicorn memory_mcp.server:app --host 0.0.0.0 --port 8007
 ```
 
-Health: `http://127.0.0.1:8007/health`  
-MCP: `http://127.0.0.1:8007/mcp`
+Health: `http://127.0.0.1:8007/api/health`
+MCP: `http://127.0.0.1:8007/api/mcp`
 
 Required env: see `env.example` (`OAUTH_*`, `JWT_SIGNING_KEY`, `STORAGE_ENCRYPTION_KEY`, `REDIS_URL`, `BASE_URL`).
 
@@ -27,7 +27,7 @@ Required env: see `env.example` (`OAUTH_*`, `JWT_SIGNING_KEY`, `STORAGE_ENCRYPTI
 ### 1. AWS setup
 
 **Option A — Lab / SSM only (simplest)**  
-- Uvicorn on port **8007**, security group: **8007** from your IP (or none public; test via SSM `curl localhost:8007/health`).  
+- Uvicorn on port **8007**, security group: **8007** from your IP (or none public; test via SSM `curl localhost:8007/api/health`).  
 - `BASE_URL=http://<public-ip>:8007` — Google OAuth may require HTTPS for real clients.
 
 **Option B — Production-shaped without nginx on the box (recommended)**  
@@ -66,14 +66,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync --frozen --no-dev
 ```
 
-Allow the service user to read the app:
+Allow the **same user as the systemd unit** to read the app:
 
 ```bash
-sudo chown -R www-data:www-data /opt/mcp-servers
-# or: sudo chown -R nginx:nginx ... on AL2023 if www-data missing — create www-data or run as ec2-user in unit
+sudo chown -R ec2-user:ec2-user /opt/mcp-servers   # Amazon Linux (default in deploy units)
+# Ubuntu: sudo chown -R www-data:www-data /opt/mcp-servers and set User=www-data in the unit
 ```
 
-On Amazon Linux, `www-data` may not exist — use `ec2-user` or `ssm-user` in the unit file instead.
+If `journalctl` shows **`status=217/USER`**, the `User=` in the unit does not exist on the OS — fix the unit and `daemon-reload` (units in this repo default to `ec2-user` for AL2023).
 
 ### 3. Environment (`/etc/mcp-servers/env`)
 
@@ -106,6 +106,29 @@ sudo systemctl status memory-mcp
 journalctl -u memory-mcp -f
 ```
 
+**`status=203/EXEC`** — systemd could not run `ExecStart` (missing venv, wrong path, or bad `uvicorn` shebang). On the instance:
+
+```bash
+sudo systemctl stop memory-mcp
+ls -la /opt/mcp-servers/.venv/bin/python
+sudo -u ec2-user /opt/mcp-servers/.venv/bin/python -m uvicorn --version
+```
+
+If `.venv` is missing, run `cd /opt/mcp-servers && uv sync --frozen --no-dev` as `ec2-user`, then set `ExecStart` to  
+`/opt/mcp-servers/.venv/bin/python -m uvicorn memory_mcp.server:app ...` (see deploy units), `daemon-reload`, and start again.
+
+**`Permission denied` on `/opt/mcp-servers/.venv/bin/uvicorn`** — the installed unit still calls the `uvicorn` script; use **`python -m uvicorn`** instead (deploy units already do). On the instance:
+
+```bash
+sudo systemctl stop memory-mcp
+sudo sed -i 's|ExecStart=.*|ExecStart=/opt/mcp-servers/.venv/bin/python -m uvicorn memory_mcp.server:app --host 127.0.0.1 --port 8007|' /etc/systemd/system/memory-mcp.service
+grep -E '^(ExecStart|Environment=PYTHONPATH)' /etc/systemd/system/memory-mcp.service
+# Add PYTHONPATH line if missing (see deploy/aws-ec2/systemd/*.service)
+sudo systemctl daemon-reload && sudo systemctl start memory-mcp
+```
+
+Build the venv as the same user as `User=` in the unit (`uv sync` as `ec2-user`, not `ssm-user`). If it still fails with permission errors on AL2023, check SELinux: `getenforce` and `sudo ausearch -m avc -ts recent`.
+
 Default unit binds **`0.0.0.0:8007`** (no nginx). Lock down **security groups** so only the ALB (or your IP) can reach 8007.
 
 ### 5. Google OAuth
@@ -115,11 +138,11 @@ Redirect URIs must match **`BASE_URL`** (scheme + host + port if non-default).
 ### 6. Verify
 
 ```bash
-curl -s http://127.0.0.1:8007/health
+curl -s http://127.0.0.1:8007/api/health
 # From outside (if SG allows):
-curl -s http://<public-ip>:8007/health
+curl -s http://<public-ip>:8007/api/health
 # Via ALB:
-curl -s https://your-domain.com/health
+curl -s https://your-domain.com/api/health
 ```
 
 ---
@@ -191,8 +214,8 @@ Important (from [FastMCP HTTP deployment](https://gofastmcp.com/deployment/http#
 ### 6. Verify
 
 ```bash
-curl -s http://127.0.0.1:8007/health          # on instance only
-curl -s https://memory-mcp.example.com/health   # public
+curl -s http://127.0.0.1:8007/api/health          # on instance
+curl -s https://memory-mcp.example.com/api/health   # public (nginx proxies /api/)
 curl -s https://memory-mcp.example.com/mcp     # MCP endpoint (may require auth)
 ```
 
@@ -205,7 +228,7 @@ Each EC2 runs the same stack (nginx + Uvicorn). Put an **ALB in front of :443** 
 ## Part 2 — Multi-instance (ALB, no nginx on EC2)
 
 1. Same AMI/user-data: `uv sync`, `/etc/mcp-servers/env`, systemd on **8007**.
-2. **Target group**: protocol HTTP, port **8007**, health check `GET /health`.
+2. **Target group**: protocol HTTP, port **8007**, health check `GET /api/health`.
 3. **ALB**: HTTPS 443 → target group (ACM on ALB).
 4. **Identical env** on every instance: `JWT_SIGNING_KEY`, `STORAGE_ENCRYPTION_KEY`, `REDIS_URL`, `BASE_URL`.
 5. `stateless_http=True` is already set in code — no sticky sessions.
