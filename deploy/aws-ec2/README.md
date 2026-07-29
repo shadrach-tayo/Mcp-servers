@@ -20,6 +20,8 @@ MCP: `http://127.0.0.1:8007/api/mcp`
 
 Required env: see `env.example` (`OAUTH_*`, `JWT_SIGNING_KEY`, `STORAGE_ENCRYPTION_KEY`, `REDIS_URL`, `BASE_URL`).
 
+**Troubleshooting Q&A:** [docs/memory-mcp-ec2-setup-qa.md](../../docs/memory-mcp-ec2-setup-qa.md) (PDF: [memory-mcp-ec2-setup-qa.pdf](../../docs/memory-mcp-ec2-setup-qa.pdf)).
+
 ---
 
 ## Part 1A — Single EC2 (no nginx)
